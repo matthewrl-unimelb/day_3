@@ -1,0 +1,23 @@
+any indirect, special, or
+consequential loss arising from or in connection with this Agreement, including loss of profits, loss of
+revenue, or loss of business opportunity, whether arising in contract, tort (including negligence), or
+otherwise. The total aggregate liability of either Party under or in connection with this Agreement must not
+exceed the total Price paid or payable under this Agreement.
+14.1 Nothing in this clause 14 excludes, restricts or modifies any right or remedy, or any guarantee,
+warranty or other term or condition implied or imposed by the Australian Consumer Law or any other
+legislation that cannot lawfully be excluded, restricted or modified.
+15. INSURANCE
+Each Party must maintain, for the duration of this Agreement, public liability insurance with a reputable
+insurer for an amount of not less than $10,000,000 per occurrence, and must provide evidence of such
+insurance to the other Party upon reasonable request.
+16. CONFIDENTIALITY
+Each Party must keep confidential all Confidential Information disclosed to it by the other Party and must
+not disclose such information to any third party without the prior written consent of the disclosing Party,
+except where disclosure is required by law, by a court of competent jurisdiction, or to that Party's
+professional advisers under a duty of confidentiality.
+17. INTELLECTUAL PROPERTY
+Nothing in this Agreement transfers or assigns any Intellectual Property Rights of either Party to the other.
+Each Party retains all right, title, and interest in its own pre-existing Intellectual Property Rights.
+18. FORCE MAJEURE
+Neither Party is liable for any failure or delay in performing its obligations under this Agreement to the
+extent that such failure or delay is caused by a Force Majeure
