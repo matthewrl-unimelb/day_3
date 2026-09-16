@@ -110,89 +110,94 @@ Contract:
 # --- RUNNING THE ANALYSIS ---
 if "chunks" in st.session_state:
     full_text = "".join(st.session_state.chunks)
+    
+    st.write("---")
+    st.markdown("## Individual Element Checks")
+    st.write("Check each element of contract formation independently below:")
 
+    # 1. LOOP FOR INDIVIDUAL BUTTONS
+    for element_name, legal_text in LEGAL_REFERENCES.items():
+        # Create a unique button for each element
+        if st.button(f"Check for {element_name}", key=f"btn_{element_name}"):
+            with st.spinner(f"Analysing {element_name}..."):
+                try:
+                    result = analyze_element(full_text, element_name, legal_text, client)
+                    st.session_state[f"{element_name}_result"] = result
+                except Exception as e:
+                    st.error(f"Something went wrong calling the API: {e}")
+
+        # If we have a result for this element (either from individual check or full run), display it
+        if f"{element_name}_result" in st.session_state:
+            result = st.session_state[f"{element_name}_result"]
+            if result.get("valid"):
+                st.markdown(f"### :green[✅ {element_name} is satisfied]")
+                st.write(result.get("explanation", ""))
+            else:
+                st.markdown(f"### :red[⚠️ {element_name} - Possible legal error]")
+                st.write(result.get("explanation", ""))
+                with st.expander(f"Show the relevant part of the contract — {element_name}"):
+                    st.write(result.get("problem_quote", "(no specific passage identified)"))
+        st.write("---") # Add a divider between elements
+
+    # 2. FULL ANALYSIS BUTTON
+    st.markdown("## Full Contract Check")
     if st.button("Run Full Contract Formation Analysis"):
         progress_bar = st.progress(0)
         total_elements = len(LEGAL_REFERENCES)
         
         try:
-            # We loop dynamically over our dictionary!
             for i, (element_name, legal_text) in enumerate(LEGAL_REFERENCES.items()):
                 with st.spinner(f"Analysing {element_name}... ({i + 1}/{total_elements})"):
-                    # Call the single function, passing the specific text for this element
                     st.session_state[f"{element_name}_result"] = analyze_element(full_text, element_name, legal_text, client)
                 progress_bar.progress(int((i + 1) / total_elements * 100))
             
             st.session_state.full_analysis_run = True
+            st.rerun() # Refresh the page to show all results at once
         except Exception as e:
             st.error(f"Something went wrong calling the API: {e}")
         finally:
             progress_bar.empty()
 
-    # --- DISPLAYING RESULTS SUMMARY ---
-    if st.session_state.get("full_analysis_run"):
-        # Gather all results into a single list
-        results = [(element, st.session_state[f"{element}_result"]) for element in LEGAL_REFERENCES.keys()]
+    # --- FIX CONTRACT ISSUES UI (WITH FEEDBACK LOOP) ---
+    def generate_contract_fixes(full_text, failed_issues, feedback, client):
+        issues_json = json.dumps(failed_issues, indent=2)
         
-        all_valid = all(r.get("valid") for _, r in results)
-        failed_labels = [label for label, r in results if not r.get("valid")]
-
-        st.write("---")
-
-        if all_valid:
-            st.markdown("## :green[✅ Contract Formation Confirmed]")
-            st.write("All seven elements of contract formation are satisfied.")
-        else:
-            st.markdown("## :red[⚠️ Contract Formation Issues Found]")
-            st.write(f"The following element(s) need attention: **{', '.join(failed_labels)}**.")
-
-        st.write("### Summary")
-        for label, result in results:
-            if result.get("valid"):
-                st.markdown(f"**{label}:** :green[✅ Valid]")
-                st.caption(result.get("explanation", ""))
-            else:
-                st.markdown(f"**{label}:** :red[⚠️ Needs attention]")
-                st.caption(result.get("explanation", ""))
-                with st.expander(f"Show the relevant part of the contract — {label}"):
-                    st.write(result.get("problem_quote", "(no specific passage identified)"))
-
-        # --- FIX CONTRACT ISSUES UI (WITH FEEDBACK LOOP) ---
-        def generate_contract_fixes(full_text, failed_issues, feedback, client):
-            issues_json = json.dumps(failed_issues, indent=2)
-            
-            feedback_instruction = ""
-            if feedback:
-                feedback_instruction = (
-                    f"\n\nThe user did not like the previous proposed revision and provided this feedback:\n"
-                    f"'{feedback}'\n"
-                    f"Please generate an ALTERNATIVE legally valid revision that accommodates this feedback "
-                    f"while still ensuring all legal formation issues are fixed."
-                )
-
-            prompt = f"""You are an expert contract lawyer. The following contract has been analyzed and found to have legal formation issues.
-            
-            Original Contract:
-            {full_text}
-            
-            Issues identified (JSON format):
-            {issues_json}
-            {feedback_instruction}
-            
-            Please rewrite the problematic clauses (or add necessary clauses) to make the contract legally valid, addressing all the identified issues. 
-            Ensure the revised text maintains the original intent of the parties as much as possible while complying with the law. 
-            Output ONLY the revised text (either the specific rewritten clauses or the full revised text, whichever is clearer). Do not include markdown blocks like ``` or introductory pleasantries.
-            """
-
-            response = client.chat.completions.create(
-                model="gpt-4o",
-                messages=[{"role": "user", "content": prompt}]
+        feedback_instruction = ""
+        if feedback:
+            feedback_instruction = (
+                f"\n\nThe user did not like the previous proposed revision and provided this feedback:\n"
+                f"'{feedback}'\n"
+                f"Please generate an ALTERNATIVE legally valid revision that accommodates this feedback "
+                f"while still ensuring all legal formation issues are fixed."
             )
-            return response.choices[0].message.content
 
-        # Only show the fix UI if there are errors
+        prompt = f"""You are an expert contract lawyer. The following contract has been analyzed and found to have legal formation issues.
+        
+        Original Contract:
+        {full_text}
+        
+        Issues identified (JSON format):
+        {issues_json}
+        {feedback_instruction}
+        
+        Please rewrite the problematic clauses (or add necessary clauses) to make the contract legally valid, addressing all the identified issues. 
+        Ensure the revised text maintains the original intent of the parties as much as possible while complying with the law. 
+        Output ONLY the revised text (either the specific rewritten clauses or the full revised text, whichever is clearer). Do not include markdown blocks like ``` or introductory pleasantries.
+        """
+
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[{"role": "user", "content": prompt}]
+        )
+        return response.choices[0].message.content
+
+    # Check if a full analysis was run, and if there are any errors to fix
+    if st.session_state.get("full_analysis_run"):
+        # Gather all current results
+        results = [(element, st.session_state.get(f"{element}_result", {})) for element in LEGAL_REFERENCES.keys()]
+        all_valid = all(r.get("valid") for _, r in results if r)
+        
         if not all_valid:
-            st.write("---")
             st.markdown("## 🛠️ Fix Contract Issues")
             
             # State 1: We haven't generated anything yet
@@ -201,7 +206,7 @@ if "chunks" in st.session_state:
                 
                 if st.button("Generate Fixes"):
                     with st.spinner("Drafting legally valid revisions..."):
-                        failed_dict = {label: res for label, res in results if not res.get("valid")}
+                        failed_dict = {label: res for label, res in results if res and not res.get("valid")}
                         st.session_state.proposed_fixes = generate_contract_fixes(full_text, failed_dict, "", client)
                         st.session_state.user_feedback = "" 
                     st.rerun() 
@@ -216,7 +221,7 @@ if "chunks" in st.session_state:
                 if st.button("Regenerate Alternative Fix"):
                     if feedback_input:
                         with st.spinner("Drafting an alternative valid version..."):
-                            failed_dict = {label: res for label, res in results if not res.get("valid")}
+                            failed_dict = {label: res for label, res in results if res and not res.get("valid")}
                             st.session_state.proposed_fixes = generate_contract_fixes(
                                 full_text, 
                                 failed_dict, 
