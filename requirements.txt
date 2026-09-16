@@ -4,4 +4,3 @@ python-dotenv
 chromadb
 pypdf
 python-docx
-json
